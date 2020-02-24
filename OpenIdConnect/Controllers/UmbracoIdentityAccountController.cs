@@ -4,8 +4,6 @@ using System.Threading.Tasks;
 using System.Web;
 using System.Web.Mvc;
 using Microsoft.AspNet.Identity;
-using Microsoft.AspNet.Identity.Owin;
-using Microsoft.Owin;
 using Microsoft.Owin.Security;
 using OpenIdConnect.Models.UmbracoIdentity;
 using Umbraco.Web;
@@ -24,22 +22,20 @@ namespace OpenIdConnect.Controllers
     [Authorize]
     public class UmbracoIdentityAccountController : SurfaceController
     {
-        private UmbracoMembersUserManager<UmbracoApplicationMember> _userManager;
-        private UmbracoMembersRoleManager<UmbracoApplicationRole> _roleManager;
+        private readonly UmbracoMembersUserManager<UmbracoApplicationMember> _userManager;
+        private readonly UmbracoMembersRoleManager<UmbracoApplicationRole> _roleManager;
+        private readonly IAuthenticationManager _authenticationManager;
 
         public UmbracoIdentityAccountController(
             UmbracoMembersUserManager<UmbracoApplicationMember> userManager,
             UmbracoMembersRoleManager<UmbracoApplicationRole> roleManager,
+            IAuthenticationManager authenticationManager,
             IUmbracoContextAccessor umbracoContextAccessor, IUmbracoDatabaseFactory databaseFactory, ServiceContext services, AppCaches appCaches, ILogger logger, IProfilingLogger profilingLogger, UmbracoHelper umbracoHelper)
             : base(umbracoContextAccessor, databaseFactory, services, appCaches, logger, profilingLogger, umbracoHelper)
         {
             _userManager = userManager;
             _roleManager = roleManager;
-        }
-
-        protected IOwinContext OwinContext
-        {
-            get { return Request.GetOwinContext(); }
+            _authenticationManager = authenticationManager;
         }
 
         #region External login and registration
@@ -63,7 +59,7 @@ namespace OpenIdConnect.Controllers
         [AllowAnonymous]
         public async Task<ActionResult> ExternalLoginCallback(string returnUrl)
         {
-            var loginInfo = await OwinContext.Authentication.GetExternalLoginInfoAsync();
+            var loginInfo = await _authenticationManager.GetExternalLoginInfoAsync();
             if (loginInfo == null)
             {
                 //go home, invalid callback
@@ -135,7 +131,7 @@ namespace OpenIdConnect.Controllers
         [HttpGet]
         public async Task<ActionResult> LinkLoginCallback(string returnUrl)
         {
-            var loginInfo = await AuthenticationManager.GetExternalLoginInfoAsync(XsrfKey, User.Identity.GetUserId());
+            var loginInfo = await _authenticationManager.GetExternalLoginInfoAsync(XsrfKey, User.Identity.GetUserId());
             if (loginInfo == null)
             {
                 TempData["LinkLoginError"] = new[] { "An error occurred, could not get external login info" };
@@ -338,7 +334,7 @@ namespace OpenIdConnect.Controllers
             if (Members.IsLoggedIn())
             {
                 //ensure to only clear the default cookies
-                OwinContext.Authentication.SignOut(DefaultAuthenticationTypes.ApplicationCookie, DefaultAuthenticationTypes.ExternalCookie);
+                _authenticationManager.SignOut(DefaultAuthenticationTypes.ApplicationCookie, DefaultAuthenticationTypes.ExternalCookie);
             }
 
             //if there is a specified path to redirect to then use it
@@ -406,18 +402,10 @@ namespace OpenIdConnect.Controllers
         // Used for XSRF protection when adding external logins
         private const string XsrfKey = "XsrfId";
 
-        private IAuthenticationManager AuthenticationManager
-        {
-            get
-            {
-                return HttpContext.GetOwinContext().Authentication;
-            }
-        }
-
         private async Task SignInAsync(UmbracoApplicationMember member, bool isPersistent)
         {
-            OwinContext.Authentication.SignOut(DefaultAuthenticationTypes.ExternalCookie);
-            OwinContext.Authentication.SignIn(new AuthenticationProperties() { IsPersistent = isPersistent },
+            _authenticationManager.SignOut(DefaultAuthenticationTypes.ExternalCookie);
+            _authenticationManager.SignIn(new AuthenticationProperties() { IsPersistent = isPersistent },
                 await member.GenerateUserIdentityAsync(_userManager));
         }
 

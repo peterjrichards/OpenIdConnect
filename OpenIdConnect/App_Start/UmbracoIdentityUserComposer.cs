@@ -16,18 +16,25 @@ namespace OpenIdConnect
     {
         public void Compose(Composition composition)
         {
-            composition.Register<UmbracoMembersUserManager<UmbracoApplicationMember>>(x =>
+            composition.Register(x =>
             {
                 //needs to resolve from Owin
                 var owinCtx = x.GetInstance<IHttpContextAccessor>().HttpContext.GetOwinContext();
                 return owinCtx.GetUserManager<UmbracoMembersUserManager<UmbracoApplicationMember>>();
             }, Lifetime.Request);
 
-            composition.Register<UmbracoMembersRoleManager<UmbracoApplicationRole>>(x =>
+            composition.Register(x =>
             {
                 //needs to resolve from Owin
                 var owinCtx = x.GetInstance<IHttpContextAccessor>().HttpContext.GetOwinContext();
                 return owinCtx.GetUserManager<UmbracoMembersRoleManager<UmbracoApplicationRole>>();
+            }, Lifetime.Request);
+
+            composition.Register(x =>
+            {
+                //needs to resolve from Owin
+                var owinCtx = x.GetInstance<IHttpContextAccessor>().HttpContext.GetOwinContext();
+                return owinCtx.Authentication;
             }, Lifetime.Request);
         }
 
